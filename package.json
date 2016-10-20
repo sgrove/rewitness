@@ -6,31 +6,33 @@
     "postinstall": "npm run build",
     "test": "echo 'No tests yet.  All good :D'",
     "start": "_build/default/src/app.out",
-    "build": "eval $(dependencyEnv) && nopam && rebel",
+    "build": "eval $(dependencyEnv) && nopam && rebel; webpack _build/web/src/web_Tar__Web.js out.js",
     "top": "eval $(dependencyEnv) && rtop",
     "env": "eval $(dependencyEnv) && env",
     "editor": "eval $(dependencyEnv) && eval $EDITOR",
-    "whereisocamlmerlin": "eval $(dependencyEnv) && which ocamlmerlin-reason"
+    "whereisocamlmerlin": "eval $(dependencyEnv) && which ocamlmerlin-reason",
+    "ramana": "eval $(dependencyEnv) && ocamldep -pp refmt -ppx bsppx.exe -ml-synonym .re -mli-synonym .rei -modules -one-line -impl src/web.re"
   },
   "dependencies": {
-    "@opam-alpha/lablgl": "*",
     "@opam-alpha/merlin": "^ 2.5.0",
     "@opam-alpha/ocaml": "4.2.3",    
     "dependency-env": "https://github.com/npm-ml/dependency-env.git",
     "nopam": "https://github.com/yunxing/nopam.git",
     "realpath": "*",
-    "rebel": "https://github.com/reasonml/rebel.git",
-    "reason": "https://github.com/facebook/reason.git"
+    "rebel": "https://github.com/vramana/rebel#cp-force",
+    "reason": "https://github.com/facebook/reason.git",
+    "bs-platform": "1.2.1",
+    "webpack": "*"
+  },
+  "devDependencies": {
   },
   "rebel": {
-    "backend": "native",
-    "ocamlfindDependencies": [
-      "lablgl.glut"
+    "targets": [
+      {
+        "target": "web",
+        "engine": "bucklescript",
+        "entry": "src/web.re"
+      }
     ]
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/bsansouci/rewitness.git"
-  },
-  "author": "bsansouci & schmavery"
+  }
 }
