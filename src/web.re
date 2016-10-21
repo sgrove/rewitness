@@ -4,6 +4,7 @@ let module Mat4 = {
   external perspective : out::t => fovy::int => aspect::float => near::float => far::float => unit = "mat4.perspective" [@@bs.val];
   external identity : out::t => unit = "mat4.identity" [@@bs.val];
   external translate : out::t => a::t => array float => unit = "mat4.translate" [@@bs.val];
+  external rotate : out::t => a::t => rad::float => array int => unit = "mat4.rotate" [@@bs.val];
 };
 
 let module Gl = {
@@ -29,7 +30,7 @@ let module Gl = {
   external bindBuffer : context => int => buffer => unit = "bindBuffer" [@@bs.send];
   external bufferData : context => int => float32array => int => unit = "bufferData" [@@bs.send];
   external setViewport : context => int => int => int => int => unit = "viewport" [@@bs.send];
-  external setClearBit : context => int => unit = "clear" [@@bs.send];
+  external clear : context => int => unit = "clear" [@@bs.send];
   external createFloat32Array : array float => float32array = "Float32Array" [@@bs.new];
   external getUniformLocation : context => program => string => uniform = "getUniformLocation" [@@bs.send];
   external getAttribLocation : context => program => string => attribute = "getAttribLocation" [@@bs.send];
@@ -54,6 +55,11 @@ let module Gl = {
 /* Dumb camera, not actually a camera like you think */
 type gl_camera = {projection_matrix: Mat4.t, model_view_matrix: Mat4.t};
 
+let module Math = {
+  external sin_of_int : int => float = "Math.sin" [@@bs.val];
+  external sin_of_float : float => float = "Math.sin" [@@bs.val];
+};
+
 let module Document = {
   type element;
   type window;
@@ -64,7 +70,7 @@ let module Document = {
   external getWidth : element => int = "width" [@@bs.get];
   external getHeight : element => int = "height" [@@bs.get];
   external requestAnimationFrame : (unit => unit) => unit = "window.requestAnimationFrame" [@@bs.val];
-  /* external getCurrentMilliseconds : unit => int = "(new Date()).getTime()" [@@bs.val]; */
+  external now : unit => int = "Date.now" [@@bs.val];
 };
 
 type gl_env = {camera: gl_camera, canvas: Document.element, gl: Gl.context};
@@ -96,7 +102,7 @@ let build_gl_env (canvas: Document.element) :gl_env => {
   Gl.setViewportHeight gl canvas_height;
   Gl.setViewport gl 0 0 canvas_width canvas_height;
   Gl.setClearColor gl 0.0 0.0 0.0 1.0;
-  Gl.setClearBit gl (Constants.color_buffer_bit lor Constants.depth_buffer_bit);
+  Gl.clear gl (Constants.color_buffer_bit lor Constants.depth_buffer_bit);
   env
 };
 
@@ -230,52 +236,46 @@ Gl.bufferData
 
 reset_mv env.camera;
 
-/* Move camera, draw triangle */
-translate_camera env.camera [|(-1.5), 0.0, (-7.0)|];
-
-Gl.bindBuffer env.gl Constants.array_buffer triangle_vertex_buffer;
-
-Gl.vertexAttribPointer env.gl vertex_position_attrib 3 Constants.float_ Js.false_ 0 0;
-
-Gl.bindBuffer env.gl Constants.array_buffer triangle_color_buffer;
-
-Gl.vertexAttribPointer env.gl vertex_color_attrib 4 Constants.float_ Js.false_ 0 0;
-
-Gl.setUniformMatrix4fv env.gl p_matrix_uniform Js.false_ env.camera.projection_matrix;
-
-Gl.setUniformMatrix4fv env.gl mv_matrix_uniform Js.false_ env.camera.model_view_matrix;
-
-Js.log "Draw triangle";
-
-Gl.drawArrays env.gl Constants.triangles 0 3;
-
-/* Move camera, draw square */
-translate_camera env.camera [|3.0, 0.0, 0.0|];
-
-Gl.bindBuffer env.gl Constants.array_buffer square_vertex_buffer;
-
-Gl.vertexAttribPointer env.gl vertex_position_attrib 3 Constants.float_ Js.false_ 0 0;
-
-Gl.bindBuffer env.gl Constants.array_buffer square_color_buffer;
-
-Gl.vertexAttribPointer env.gl vertex_color_attrib 4 Constants.float_ Js.false_ 0 0;
-
-Gl.setUniformMatrix4fv env.gl p_matrix_uniform Js.false_ env.camera.projection_matrix;
-
-Gl.setUniformMatrix4fv env.gl mv_matrix_uniform Js.false_ env.camera.model_view_matrix;
-
-Js.log "Draw square";
-
-Gl.drawArrays env.gl Constants.triangle_strip 0 4;
-
-Js.log "Finished drawing!";
-
 Document.setGlDebug Document.window env.gl;
 
 Js.log env;
 
+let draw_scene (time: int) => {
+  Gl.clear env.gl (Constants.color_buffer_bit lor Constants.depth_buffer_bit);
+  reset_mv env.camera;
+  let float_time = Math.sin_of_float (float_of_int time /. 500.0);
+  let angle = float_of_int time /. 100.0;
+  /* Move camera, draw triangle */
+  Mat4.rotate env.camera.model_view_matrix env.camera.model_view_matrix angle [|0, 0, 1|];
+  translate_camera env.camera [|(-1.5), 0.0, (-7.0)|];
+  Gl.bindBuffer env.gl Constants.array_buffer triangle_vertex_buffer;
+  Gl.vertexAttribPointer env.gl vertex_position_attrib 3 Constants.float_ Js.false_ 0 0;
+  Gl.bindBuffer env.gl Constants.array_buffer triangle_color_buffer;
+  Gl.vertexAttribPointer env.gl vertex_color_attrib 4 Constants.float_ Js.false_ 0 0;
+  Gl.setUniformMatrix4fv env.gl p_matrix_uniform Js.false_ env.camera.projection_matrix;
+  Gl.setUniformMatrix4fv env.gl mv_matrix_uniform Js.false_ env.camera.model_view_matrix;
+  /* Js.log "Draw triangle"; */
+  Gl.drawArrays env.gl Constants.triangles 0 3;
+  /* Move camera, draw square */
+  /* Js.log (string_of_int time ^ " :-: " ^ string_of_float sy); */
+  reset_mv env.camera;
+  let sy = 2.0 *. float_time;
+  translate_camera env.camera [|(-1.5), 0.0, (-7.0)|];
+  translate_camera env.camera [|3.0, sy, 0.0|];
+  Gl.bindBuffer env.gl Constants.array_buffer square_vertex_buffer;
+  Gl.vertexAttribPointer env.gl vertex_position_attrib 3 Constants.float_ Js.false_ 0 0;
+  Gl.bindBuffer env.gl Constants.array_buffer square_color_buffer;
+  Gl.vertexAttribPointer env.gl vertex_color_attrib 4 Constants.float_ Js.false_ 0 0;
+  Gl.setUniformMatrix4fv env.gl p_matrix_uniform Js.false_ env.camera.projection_matrix;
+  Gl.setUniformMatrix4fv env.gl mv_matrix_uniform Js.false_ env.camera.model_view_matrix;
+  /* Js.log "Draw square"; */
+  Gl.drawArrays env.gl Constants.triangle_strip 0 4
+  /* Js.log "Finished drawing!" */
+};
+
 let rec tick () => {
-  Js.log "Tick!";
+  /* Js.log "Tick!"; */
+  draw_scene (Document.now ());
   Document.requestAnimationFrame tick
 };
 
